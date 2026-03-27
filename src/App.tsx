@@ -1,11 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from '@google/genai';
-import { Info, Volume2, Square, Undo2 } from 'lucide-react';
+import { Info, Volume2, Square, Undo2, MessageSquare, X, History, Download, Bot, Send, Minimize2, Sparkles } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { cn } from './lib/utils';
 
 // --- Types ---
 type Step = 1 | 2 | 3 | 4;
+
+interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
+interface ArtifactVersion {
+  id: string;
+  timestamp: number;
+  text: string;
+  wordCount: number;
+}
 
 interface DimensionScore {
   name: string;
@@ -43,13 +57,35 @@ export default function App() {
   const [highlightedEvidence, setHighlightedEvidence] = useState<number | null>(null);
   const [isReadingAloud, setIsReadingAloud] = useState(false);
   const [undoHistory, setUndoHistory] = useState<string[]>([]);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [versions, setVersions] = useState<ArtifactVersion[]>([]);
+  const [isVersionHistoryModalOpen, setIsVersionHistoryModalOpen] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [thinkAloudText, setThinkAloudText] = useState('');
+  const [isConciergeOpen, setIsConciergeOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([{ role: 'model', text: 'Hi! I am your Live Concierge. How can I help you with the app today?' }]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatRef = useRef<any>(null);
 
   useEffect(() => {
     const savedDraft = localStorage.getItem('instructional_integrity_draft');
     if (savedDraft) {
       setInputText(savedDraft);
+    }
+    const savedVersions = localStorage.getItem('instructional_integrity_versions');
+    if (savedVersions) {
+      try {
+        setVersions(JSON.parse(savedVersions));
+      } catch (e) {
+        console.error("Failed to parse saved versions", e);
+      }
     }
   }, []);
 
@@ -117,17 +153,72 @@ export default function App() {
     }
   };
 
+  const getChat = () => {
+    if (!chatRef.current) {
+      const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '' });
+      chatRef.current = ai.chats.create({
+        model: 'gemini-3.1-flash-lite-preview',
+        config: {
+          systemInstruction: "You are the Live Concierge for the Instructional Integrity Studio. Provide fast, on-demand tech support. Help users navigate the app, explain the UI, and troubleshoot. DO NOT evaluate instructional content. Keep responses short, friendly, and low-latency."
+        }
+      });
+    }
+    return chatRef.current;
+  };
+
+  const handleFeedbackSubmit = () => {
+    if (!feedbackText.trim()) return;
+    setIsSubmittingFeedback(true);
+    // Mock API call
+    setTimeout(() => {
+      setIsSubmittingFeedback(false);
+      setFeedbackSuccess(true);
+      setTimeout(() => {
+        setIsFeedbackModalOpen(false);
+        setFeedbackSuccess(false);
+        setFeedbackText('');
+      }, 2000);
+    }, 1000);
+  };
+
+  const handleSendChatMessage = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setIsChatLoading(true);
+    try {
+      const chat = getChat();
+      const response = await chat.sendMessageStream({ message: userMsg });
+      let modelText = '';
+      setChatMessages(prev => [...prev, { role: 'model', text: '' }]);
+      for await (const chunk of response) {
+        modelText += chunk.text;
+        setChatMessages(prev => {
+          const newMessages = [...prev];
+          newMessages[newMessages.length - 1].text = modelText;
+          return newMessages;
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { role: 'model', text: 'Sorry, I encountered a network error. Please try again.' }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   const startEvaluation = async () => {
     handleNextStep(); // Move to step 3 (Processing)
     setIsEvaluating(true);
+    setThinkAloudText('');
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '' });
       
       const prompt = `You are the Instructional Integrity Studio backend.
 You evaluate instructional text for 'Cognitive Safety'—whether the explanation produces correct understanding in the learner, not just if it is factually true.
-Analyze the provided text and return a JSON object with the following structure.
 
 CRITICAL TONE INSTRUCTIONS:
 - Ensure the tone is objective, supportive, gentle, and extremely clear.
@@ -135,52 +226,53 @@ CRITICAL TONE INSTRUCTIONS:
 - Frame remediations as gentle adjustments and supportive guidance rather than urgent warnings.
 - Do not use sarcasm or ambiguity.
 
+Task 1: Think Aloud
+First, provide a "Think Aloud" narrative. Explain your thought process as you read the text, what you are looking for regarding clarity, cognitive load, and instructional integrity, and your initial impressions. Write 2-3 paragraphs.
+
+Task 2: JSON Evaluation
+Then, provide the final evaluation strictly as a JSON object enclosed in \`\`\`json ... \`\`\`.
+
+JSON Structure:
+{
+  "dimensions": [
+    { "name": "string", "score": number (1-10), "evidence": "string", "remediation": "string" }
+  ],
+  "frictionPoints": ["string"],
+  "overallAssessment": "string"
+}
+
 Text to review:
 """
 ${inputText}
 """`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+      const response = await ai.models.generateContentStream({
+        model: 'gemini-3.1-pro-preview',
         contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              dimensions: {
-                type: Type.ARRAY,
-                description: "Exactly 10 dimensions of cognitive safety evaluation.",
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: "Name of the dimension (e.g., 'Prerequisite Clarity', 'Concept Sequencing')" },
-                    score: { type: Type.NUMBER, description: "Score from 1 to 10. 1 is very unsafe, 10 is very safe." },
-                    evidence: { type: Type.STRING, description: "Specific quote or evidence from the text." },
-                    remediation: { type: Type.STRING, description: "Clear, step-by-step instruction on how to fix this issue." }
-                  },
-                  required: ["name", "score", "evidence", "remediation"]
-                }
-              },
-              frictionPoints: {
-                type: Type.ARRAY,
-                description: "List of identified cognitive friction points, e.g., 'Concept Overload', 'Missing Prerequisite'. Empty array if none.",
-                items: { type: Type.STRING }
-              },
-              overallAssessment: {
-                type: Type.STRING,
-                description: "A clear, unambiguous summary of the text's cognitive safety. Use simple, direct language."
-              }
-            },
-            required: ["dimensions", "frictionPoints", "overallAssessment"]
-          }
-        }
       });
 
-      const resultText = response.text;
-      if (!resultText) throw new Error("No response from the evaluation service.");
-      
-      const parsedResult = JSON.parse(resultText) as EvaluationResult;
+      let fullText = '';
+      for await (const chunk of response) {
+        fullText += chunk.text;
+        const thinkAloudPart = fullText.split('```json')[0];
+        setThinkAloudText(thinkAloudPart);
+      }
+
+      const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
+      let jsonString = '';
+      if (jsonMatch && jsonMatch[1]) {
+        jsonString = jsonMatch[1];
+      } else {
+        const startIdx = fullText.indexOf('{');
+        const endIdx = fullText.lastIndexOf('}');
+        if (startIdx !== -1 && endIdx !== -1) {
+          jsonString = fullText.substring(startIdx, endIdx + 1);
+        } else {
+          throw new Error("Could not parse JSON from response.");
+        }
+      }
+
+      const parsedResult = JSON.parse(jsonString) as EvaluationResult;
       setEvaluationResult(parsedResult);
       handleNextStep(); // Move to step 4 (Results)
     } catch (err: any) {
@@ -249,8 +341,27 @@ ${inputText}
 
   const handleSaveDraft = () => {
     localStorage.setItem('instructional_integrity_draft', inputText);
+    
+    // Save as a version
+    const newVersion: ArtifactVersion = {
+      id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+      timestamp: Date.now(),
+      text: inputText,
+      wordCount: wordCount
+    };
+    
+    const updatedVersions = [newVersion, ...versions].slice(0, 20); // Keep last 20 versions
+    setVersions(updatedVersions);
+    localStorage.setItem('instructional_integrity_versions', JSON.stringify(updatedVersions));
+
     setIsDraftSaved(true);
     setTimeout(() => setIsDraftSaved(false), 2000);
+  };
+
+  const handleRestoreVersion = (version: ArtifactVersion) => {
+    setUndoHistory(prev => [...prev, inputText]); // Allow undoing the restore
+    setInputText(version.text);
+    setIsVersionHistoryModalOpen(false);
   };
 
   const handleRemediationClick = (index: number) => {
@@ -295,6 +406,122 @@ ${inputText}
       window.speechSynthesis.speak(utterance);
       setIsReadingAloud(true);
     }
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownload = async (format: 'json' | 'txt' | 'md' | 'docx' | 'pdf') => {
+    if (!evaluationResult) return;
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `instructional-review-${timestamp}`;
+
+    if (format === 'json') {
+      const blob = new Blob([JSON.stringify(evaluationResult, null, 2)], { type: 'application/json' });
+      downloadBlob(blob, `${filename}.json`);
+    } else if (format === 'txt') {
+      let content = `Instructional Integrity Review\n\n`;
+      content += `Overall Assessment:\n${evaluationResult.overallAssessment}\n\n`;
+      if (evaluationResult.frictionPoints.length > 0) {
+        content += `Friction Points:\n- ${evaluationResult.frictionPoints.join('\n- ')}\n\n`;
+      }
+      content += `Dimensions:\n`;
+      evaluationResult.dimensions.forEach(dim => {
+        content += `\n[${dim.score}/10] ${dim.name}\n`;
+        content += `Evidence: ${dim.evidence}\n`;
+        content += `Remediation: ${dim.remediation}\n`;
+      });
+      const blob = new Blob([content], { type: 'text/plain' });
+      downloadBlob(blob, `${filename}.txt`);
+    } else if (format === 'md') {
+      let content = `# Instructional Integrity Review\n\n`;
+      content += `## Overall Assessment\n${evaluationResult.overallAssessment}\n\n`;
+      if (evaluationResult.frictionPoints.length > 0) {
+        content += `## Friction Points\n- ${evaluationResult.frictionPoints.join('\n- ')}\n\n`;
+      }
+      content += `## Dimensions\n`;
+      evaluationResult.dimensions.forEach(dim => {
+        content += `\n### ${dim.name} (${dim.score}/10)\n`;
+        content += `**Evidence:** ${dim.evidence}\n\n`;
+        content += `**Remediation:** ${dim.remediation}\n`;
+      });
+      const blob = new Blob([content], { type: 'text/markdown' });
+      downloadBlob(blob, `${filename}.md`);
+    } else if (format === 'docx') {
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({ text: "Instructional Integrity Review", heading: HeadingLevel.HEADING_1 }),
+            new Paragraph({ text: "Overall Assessment", heading: HeadingLevel.HEADING_2 }),
+            new Paragraph({ text: evaluationResult.overallAssessment }),
+            ...(evaluationResult.frictionPoints.length > 0 ? [
+              new Paragraph({ text: "Friction Points", heading: HeadingLevel.HEADING_2 }),
+              ...evaluationResult.frictionPoints.map(fp => new Paragraph({ text: fp, bullet: { level: 0 } }))
+            ] : []),
+            new Paragraph({ text: "Dimensions", heading: HeadingLevel.HEADING_2 }),
+            ...evaluationResult.dimensions.flatMap(dim => [
+              new Paragraph({ text: `${dim.name} (${dim.score}/10)`, heading: HeadingLevel.HEADING_3 }),
+              new Paragraph({ children: [new TextRun({ text: "Evidence: ", bold: true }), new TextRun({ text: dim.evidence })] }),
+              new Paragraph({ children: [new TextRun({ text: "Remediation: ", bold: true }), new TextRun({ text: dim.remediation })] }),
+            ])
+          ]
+        }]
+      });
+      const blob = await Packer.toBlob(doc);
+      downloadBlob(blob, `${filename}.docx`);
+    } else if (format === 'pdf') {
+      const doc = new jsPDF();
+      let y = 20;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 15;
+      const maxWidth = 180;
+
+      const addText = (text: string, fontSize: number, isBold: boolean = false) => {
+        doc.setFontSize(fontSize);
+        doc.setFont("helvetica", isBold ? "bold" : "normal");
+        const lines = doc.splitTextToSize(text, maxWidth);
+        for (let i = 0; i < lines.length; i++) {
+          if (y > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          doc.text(lines[i], margin, y);
+          y += fontSize * 0.4; // line height approx
+        }
+        y += 5; // paragraph spacing
+      };
+
+      addText("Instructional Integrity Review", 18, true);
+      y += 5;
+      addText("Overall Assessment", 14, true);
+      addText(evaluationResult.overallAssessment, 11);
+      
+      if (evaluationResult.frictionPoints.length > 0) {
+        addText("Friction Points", 14, true);
+        evaluationResult.frictionPoints.forEach(fp => addText(`• ${fp}`, 11));
+      }
+
+      addText("Dimensions", 14, true);
+      evaluationResult.dimensions.forEach(dim => {
+        addText(`${dim.name} (${dim.score}/10)`, 12, true);
+        addText(`Evidence: ${dim.evidence}`, 11);
+        addText(`Remediation: ${dim.remediation}`, 11);
+        y += 5;
+      });
+
+      doc.save(`${filename}.pdf`);
+    }
+    setIsDownloadModalOpen(false);
   };
 
   // --- Parallax Effect ---
@@ -492,9 +719,17 @@ ${inputText}
                     </button>
                     <button 
                       onClick={handleSaveDraft} 
-                      className="font-mono text-sm uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors"
+                      disabled={!inputText.trim()}
+                      className="font-mono text-sm uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isDraftSaved ? "✓ Saved" : "Save Draft"}
+                      {isDraftSaved ? "✓ Version Saved" : "Save Version"}
+                    </button>
+                    <button 
+                      onClick={() => setIsVersionHistoryModalOpen(true)} 
+                      disabled={versions.length === 0}
+                      className="font-mono text-sm uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <History className="w-4 h-4" /> History
                     </button>
                   </div>
                   <button 
@@ -519,7 +754,7 @@ ${inputText}
                 animate={{ opacity: 1, scale: 1 }}
                 className="glass-panel p-12 rounded-[32px] flex flex-col items-center justify-center min-h-[500px] text-center"
               >
-                <div className="w-32 h-32 border-4 border-border rounded-full relative mb-8">
+                <div className="w-16 h-16 border-4 border-zinc-800 border-t-white rounded-full mb-8 relative">
                   <motion.div 
                     className="absolute inset-0 border-4 border-zinc-300 rounded-full border-t-transparent"
                     animate={{ rotate: 360 }}
@@ -527,7 +762,18 @@ ${inputText}
                   />
                 </div>
                 <h2 className="text-3xl md:text-4xl font-bold uppercase mb-4">Reviewing Instructional Flow</h2>
-                <p className="font-mono text-sm text-zinc-400 tracking-[0.2em] uppercase">Please hold. Do not close this window.</p>
+                <p className="font-mono text-sm text-zinc-400 tracking-[0.2em] uppercase mb-8">Applying cognitive safety heuristics...</p>
+                
+                {/* Think Aloud Box */}
+                <div className="w-full max-w-2xl bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 text-left overflow-hidden relative mt-4">
+                   <div className="font-mono text-[10px] uppercase text-zinc-500 mb-3 flex items-center gap-2">
+                     <Sparkles className="w-3 h-3" /> Live Think Aloud
+                   </div>
+                   <div className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                     {thinkAloudText || "Initiating cognitive assessment..."}
+                     <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
+                   </div>
+                </div>
               </motion.section>
             )}
 
@@ -613,7 +859,13 @@ ${inputText}
                   ))}
                 </div>
 
-                <div className="flex justify-center mt-4 mb-12">
+                <div className="flex justify-center gap-4 mt-4 mb-12 flex-wrap">
+                  <button 
+                    onClick={() => setIsDownloadModalOpen(true)} 
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-zinc-900 border border-zinc-800 px-8 py-4 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white uppercase tracking-widest"
+                  >
+                    <Download className="w-4 h-4" /> Download Results
+                  </button>
                   <button 
                     onClick={handleStartOver} 
                     className="inline-flex items-center justify-center rounded-2xl bg-white px-8 py-4 text-sm font-medium text-black transition hover:bg-zinc-200 uppercase tracking-widest"
@@ -705,7 +957,270 @@ ${inputText}
               </div>
             </div>
           )}
+
+          <div className="mt-auto pt-8 border-t border-border">
+            <button
+              onClick={() => setIsFeedbackModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-mono text-xs uppercase tracking-widest transition-colors border border-zinc-800 bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Send Feedback
+            </button>
+          </div>
         </aside>
+      </div>
+
+      {/* Feedback Modal */}
+      <AnimatePresence>
+        {isFeedbackModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 md:p-12 w-full max-w-lg shadow-2xl relative"
+            >
+              <button
+                onClick={() => !isSubmittingFeedback && setIsFeedbackModalOpen(false)}
+                className="absolute top-8 right-8 text-zinc-500 hover:text-white transition-colors"
+                disabled={isSubmittingFeedback}
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <h3 className="text-3xl font-bold uppercase mb-2">Feedback</h3>
+              <p className="text-zinc-400 mb-8">Help us improve the Instructional Integrity Studio. Report issues or suggest new features.</p>
+
+              {feedbackSuccess ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center"
+                >
+                  <div className="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-8 h-8" />
+                  </div>
+                  <h4 className="text-xl font-bold uppercase mb-2">Thank You</h4>
+                  <p className="text-zinc-400">Your feedback has been successfully submitted and will be reviewed by our team.</p>
+                </motion.div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  <textarea
+                    className="w-full h-40 bg-black/30 backdrop-blur-md border border-zinc-800 rounded-[20px] p-6 font-sans text-base text-white focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all resize-none"
+                    placeholder="Describe your issue or suggestion..."
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    disabled={isSubmittingFeedback}
+                  />
+                  <div className="flex justify-end gap-4">
+                    <button
+                      onClick={() => setIsFeedbackModalOpen(false)}
+                      disabled={isSubmittingFeedback}
+                      className="px-6 py-3 rounded-2xl font-mono text-xs uppercase tracking-widest transition-colors text-zinc-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleFeedbackSubmit}
+                      disabled={!feedbackText.trim() || isSubmittingFeedback}
+                      className={cn(
+                        "px-8 py-3 rounded-2xl font-mono text-xs uppercase tracking-widest transition-colors flex items-center justify-center min-w-[140px]",
+                        feedbackText.trim() && !isSubmittingFeedback
+                          ? "bg-white text-black hover:bg-zinc-200"
+                          : "bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed"
+                      )}
+                    >
+                      {isSubmittingFeedback ? (
+                        <motion.div
+                          className="w-4 h-4 border-2 border-zinc-600 border-t-zinc-400 rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        />
+                      ) : (
+                        "Submit"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Version History Modal */}
+      <AnimatePresence>
+        {isVersionHistoryModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 md:p-12 w-full max-w-2xl shadow-2xl relative max-h-[80vh] flex flex-col"
+            >
+              <button
+                onClick={() => setIsVersionHistoryModalOpen(false)}
+                className="absolute top-8 right-8 text-zinc-500 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <h3 className="text-3xl font-bold uppercase mb-2">Version History</h3>
+              <p className="text-zinc-400 mb-8">Review and restore previous versions of your instructional artifact.</p>
+
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+                {versions.length === 0 ? (
+                  <p className="text-zinc-500 font-mono text-sm">No versions saved yet.</p>
+                ) : (
+                  versions.map((v) => (
+                    <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-xs text-zinc-400 mb-2">
+                          {new Date(v.timestamp).toLocaleString()}
+                        </div>
+                        <div className="text-sm text-zinc-300 line-clamp-2 break-words">
+                          {v.text || <span className="italic opacity-50">Empty document</span>}
+                        </div>
+                        <div className="font-mono text-[10px] text-zinc-500 mt-3 uppercase tracking-widest">
+                          {v.wordCount} words
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRestoreVersion(v)}
+                        className="shrink-0 px-6 py-3 rounded-xl font-mono text-xs uppercase tracking-widest transition-colors bg-white text-black hover:bg-zinc-200"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Download Modal */}
+      <AnimatePresence>
+        {isDownloadModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-zinc-950 border border-zinc-800 rounded-[32px] p-8 md:p-12 w-full max-w-md shadow-2xl relative"
+            >
+              <button
+                onClick={() => setIsDownloadModalOpen(false)}
+                className="absolute top-8 right-8 text-zinc-500 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <h3 className="text-3xl font-bold uppercase mb-2">Download</h3>
+              <p className="text-zinc-400 mb-8">Select a format to save your evaluation results.</p>
+
+              <div className="flex flex-col gap-3">
+                {[
+                  { id: 'pdf', label: 'PDF Document (.pdf)' },
+                  { id: 'docx', label: 'Word Document (.docx)' },
+                  { id: 'md', label: 'Markdown (.md)' },
+                  { id: 'txt', label: 'Plain Text (.txt)' },
+                  { id: 'json', label: 'JSON Data (.json)' }
+                ].map((format) => (
+                  <button
+                    key={format.id}
+                    onClick={() => handleDownload(format.id as any)}
+                    className="w-full flex items-center justify-between px-6 py-4 rounded-2xl font-mono text-sm transition-colors bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white group"
+                  >
+                    <span>{format.label}</span>
+                    <Download className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Live Concierge Widget */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <AnimatePresence>
+          {isConciergeOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              className="bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl w-[350px] h-[450px] mb-4 flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="bg-zinc-900 border-b border-zinc-800 p-4 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-white" />
+                  <span className="font-mono text-sm uppercase tracking-widest font-bold">Live Concierge</span>
+                </div>
+                <button onClick={() => setIsConciergeOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={cn("max-w-[85%] rounded-xl p-3 text-sm", msg.role === 'user' ? "bg-white text-black self-end" : "bg-zinc-800 text-white self-start")}>
+                    {msg.text}
+                  </div>
+                ))}
+                {isChatLoading && (
+                  <div className="bg-zinc-800 text-white self-start max-w-[85%] rounded-xl p-3 text-sm flex items-center gap-2">
+                    <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" />
+                    <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                  </div>
+                )}
+              </div>
+              
+              {/* Input */}
+              <div className="p-3 border-t border-zinc-800 bg-zinc-900 flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendChatMessage()}
+                  placeholder="Ask for tech support..."
+                  className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+                />
+                <button
+                  onClick={handleSendChatMessage}
+                  disabled={!chatInput.trim() || isChatLoading}
+                  className="bg-white text-black p-2 rounded-lg disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        <button
+          onClick={() => setIsConciergeOpen(!isConciergeOpen)}
+          className="bg-zinc-900 border border-zinc-800 text-white p-4 rounded-full shadow-lg hover:bg-zinc-800 transition-colors flex items-center justify-center"
+        >
+          {isConciergeOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
+        </button>
       </div>
     </>
   );
