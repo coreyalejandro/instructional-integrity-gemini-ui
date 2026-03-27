@@ -31,6 +31,14 @@ export default function App() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDraftSaved, setIsDraftSaved] = useState(false);
+
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('instructional_integrity_draft');
+    if (savedDraft) {
+      setInputText(savedDraft);
+    }
+  }, []);
 
   const wordCount = inputText.trim().split(/\s+/).filter(word => word.length > 0).length;
   const isInputValid = wordCount >= MIN_WORDS && wordCount <= MAX_WORDS;
@@ -126,6 +134,12 @@ ${inputText}
     setError(null);
     setCurrentStep(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSaveDraft = () => {
+    localStorage.setItem('instructional_integrity_draft', inputText);
+    setIsDraftSaved(true);
+    setTimeout(() => setIsDraftSaved(false), 2000);
   };
 
   // --- Parallax Effect ---
@@ -227,12 +241,20 @@ ${inputText}
                 </div>
                 
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-                  <button 
-                    onClick={handlePrevStep} 
-                    className="font-mono text-sm uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors"
-                  >
-                    ← Go Back
-                  </button>
+                  <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-start">
+                    <button 
+                      onClick={handlePrevStep} 
+                      className="font-mono text-sm uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors"
+                    >
+                      ← Go Back
+                    </button>
+                    <button 
+                      onClick={handleSaveDraft} 
+                      className="font-mono text-sm uppercase tracking-widest text-zinc-400 hover:text-zinc-200 transition-colors"
+                    >
+                      {isDraftSaved ? "✓ Saved" : "Save Draft"}
+                    </button>
+                  </div>
                   <button 
                     onClick={startEvaluation}
                     disabled={!isInputValid}
