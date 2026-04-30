@@ -43,7 +43,7 @@ interface AppError {
 
 // --- Constants ---
 const MIN_WORDS = 10;
-const MAX_WORDS = 2000;
+const MAX_WORDS = 10000;
 
 // --- Main Component ---
 export default function App() {
@@ -97,7 +97,36 @@ export default function App() {
     };
   }, []);
 
+  // --- Autosave ---
+  const inputTextRef = useRef(inputText);
+  useEffect(() => {
+    inputTextRef.current = inputText;
+  }, [inputText]);
+
+  useEffect(() => {
+    // Save on inactivity (2 seconds)
+    const timeoutId = setTimeout(() => {
+      if (inputText.trim()) {
+        localStorage.setItem('instructional_integrity_draft', inputText);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [inputText]);
+
+  useEffect(() => {
+    // Save every 30 seconds
+    const intervalId = setInterval(() => {
+      if (inputTextRef.current.trim()) {
+        localStorage.setItem('instructional_integrity_draft', inputTextRef.current);
+      }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const wordCount = inputText.trim().split(/\s+/).filter(word => word.length > 0).length;
+  const charCount = inputText.length;
   const isInputValid = wordCount >= MIN_WORDS && wordCount <= MAX_WORDS;
 
   // --- Handlers ---
@@ -559,12 +588,12 @@ ${inputText}
             <div className="w-4 h-4 rounded-full border-2 border-zinc-500"></div>
           </div>
           <div className="flex flex-col gap-4 items-center">
-            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-500 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Archive</span>
-            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-500 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Atelier</span>
-            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-500 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>The Clinic</span>
-            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-500 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Lounge</span>
+            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-400 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Archive</span>
+            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-400 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Atelier</span>
+            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-400 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>The Clinic</span>
+            <span className="uppercase tracking-[0.2em] text-xs font-bold text-zinc-400 hover:text-zinc-300 hover:opacity-100 transition-all cursor-pointer" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Lounge</span>
           </div>
-          <div className="text-zinc-500">●</div>
+          <div className="text-zinc-400">●</div>
         </nav>
 
         {/* Main Content */}
@@ -654,10 +683,10 @@ ${inputText}
                 </p>
                 
                 <div className="viz-card p-8 mb-12 border-l-4 border-l-zinc-500">
-                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2 uppercase tracking-wide text-white">
+                  <h2 className="font-bold text-xl mb-4 flex items-center gap-2 uppercase tracking-wide text-white">
                     <Info className="text-white" />
                     Guiding Principles
-                  </h3>
+                  </h2>
                   <ul className="list-disc pl-5 space-y-3 text-lg text-white">
                     <li>Please follow every step in order. Do not skip any steps.</li>
                     <li>Read all instructions on the screen before clicking buttons.</li>
@@ -737,7 +766,7 @@ ${inputText}
                     disabled={!isInputValid}
                     className={cn(
                       "inline-flex items-center justify-center rounded-2xl px-8 py-4 text-sm font-medium transition uppercase tracking-widest w-full sm:w-auto", 
-                      isInputValid ? "bg-white text-black hover:bg-zinc-200" : "bg-zinc-900 text-zinc-500 cursor-not-allowed border border-border"
+                      isInputValid ? "bg-white text-black hover:bg-zinc-200" : "bg-zinc-900 text-zinc-400 cursor-not-allowed border border-border"
                     )}
                   >
                     Begin Review
@@ -766,7 +795,7 @@ ${inputText}
                 
                 {/* Think Aloud Box */}
                 <div className="w-full max-w-2xl bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 text-left overflow-hidden relative mt-4">
-                   <div className="font-mono text-[10px] uppercase text-zinc-500 mb-3 flex items-center gap-2">
+                   <div className="font-mono text-[10px] uppercase text-zinc-400 mb-3 flex items-center gap-2">
                      <Sparkles className="w-3 h-3" /> Live Think Aloud
                    </div>
                    <div className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap h-[200px] overflow-y-auto custom-scrollbar pr-2">
@@ -897,11 +926,15 @@ ${inputText}
           <ul className="list-none flex flex-col">
             <li className="py-6 border-b border-border flex justify-between items-center hover:pl-4 hover:text-zinc-300 transition-all">
               <span className="uppercase text-sm">Current Step</span>
-              <span className="font-mono text-xs text-zinc-500">Step {currentStep} of 4</span>
+              <span className="font-mono text-xs text-zinc-400">Step {currentStep} of 4</span>
             </li>
             <li className="py-6 border-b border-border flex justify-between items-center hover:pl-4 hover:text-zinc-300 transition-all">
               <span className="uppercase text-sm">Word Count</span>
-              <span className="font-mono text-xs text-zinc-500">{wordCount}</span>
+              <span className="font-mono text-xs text-zinc-400">{wordCount}</span>
+            </li>
+            <li className="py-6 border-b border-border flex justify-between items-center hover:pl-4 hover:text-zinc-300 transition-all">
+              <span className="uppercase text-sm">Character Count</span>
+              <span className="font-mono text-xs text-zinc-400">{charCount}</span>
             </li>
             <li className="py-6 border-b border-border flex justify-between items-center hover:pl-4 hover:text-zinc-300 transition-all">
               <span className="uppercase text-sm">Status</span>
@@ -917,7 +950,7 @@ ${inputText}
 
           {currentStep === 2 && !isPacing && (
             <div className="mt-auto pt-8 border-t border-border">
-              <div className="font-mono text-xs text-zinc-500 mb-4">INPUT VALIDATION</div>
+              <div className="font-mono text-xs text-zinc-400 mb-4">INPUT VALIDATION</div>
               <div className="flex items-end h-[60px] gap-2">
                 <div className={cn("flex-1 rounded-t-sm transition-all duration-1000 relative", wordCount > 0 ? "bg-zinc-500 h-full" : "bg-zinc-800 h-[20%]")}>
                   <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent"></div>
@@ -929,7 +962,7 @@ ${inputText}
                   <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent"></div>
                 </div>
               </div>
-              <div className="mt-4 font-mono text-[10px] flex justify-between text-zinc-500">
+              <div className="mt-4 font-mono text-[10px] flex justify-between text-zinc-400">
                 <span>MIN: {MIN_WORDS}</span>
                 <span>MAX: {MAX_WORDS}</span>
               </div>
@@ -949,7 +982,7 @@ ${inputText}
                       {error.message}
                     </p>
                     <div className="bg-black/40 p-3 rounded-lg border border-zinc-800">
-                      <span className="font-mono text-[10px] uppercase text-zinc-500 block mb-1">Suggested Action</span>
+                      <span className="font-mono text-[10px] uppercase text-zinc-400 block mb-1">Suggested Action</span>
                       <p className="text-sm text-white font-medium">{error.solution}</p>
                     </div>
                   </div>
@@ -987,13 +1020,13 @@ ${inputText}
             >
               <button
                 onClick={() => !isSubmittingFeedback && setIsFeedbackModalOpen(false)}
-                className="absolute top-8 right-8 text-zinc-500 hover:text-white transition-colors"
+                className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"
                 disabled={isSubmittingFeedback}
               >
                 <X className="w-6 h-6" />
               </button>
 
-              <h3 className="text-3xl font-bold uppercase mb-2">Feedback</h3>
+              <h2 className="text-3xl font-bold uppercase mb-2">Feedback</h2>
               <p className="text-zinc-400 mb-8">Help us improve the Instructional Integrity Studio. Report issues or suggest new features.</p>
 
               {feedbackSuccess ? (
@@ -1069,17 +1102,17 @@ ${inputText}
             >
               <button
                 onClick={() => setIsVersionHistoryModalOpen(false)}
-                className="absolute top-8 right-8 text-zinc-500 hover:text-white transition-colors"
+                className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
 
-              <h3 className="text-3xl font-bold uppercase mb-2">Version History</h3>
+              <h2 className="text-3xl font-bold uppercase mb-2">Version History</h2>
               <p className="text-zinc-400 mb-8">Review and restore previous versions of your instructional artifact.</p>
 
               <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
                 {versions.length === 0 ? (
-                  <p className="text-zinc-500 font-mono text-sm">No versions saved yet.</p>
+                  <p className="text-zinc-400 font-mono text-sm">No versions saved yet.</p>
                 ) : (
                   versions.map((v) => (
                     <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1090,7 +1123,7 @@ ${inputText}
                         <div className="text-sm text-zinc-300 line-clamp-2 break-words">
                           {v.text || <span className="italic opacity-50">Empty document</span>}
                         </div>
-                        <div className="font-mono text-[10px] text-zinc-500 mt-3 uppercase tracking-widest">
+                        <div className="font-mono text-[10px] text-zinc-400 mt-3 uppercase tracking-widest">
                           {v.wordCount} words
                         </div>
                       </div>
@@ -1125,12 +1158,12 @@ ${inputText}
             >
               <button
                 onClick={() => setIsDownloadModalOpen(false)}
-                className="absolute top-8 right-8 text-zinc-500 hover:text-white transition-colors"
+                className="absolute top-8 right-8 text-zinc-400 hover:text-white transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
 
-              <h3 className="text-3xl font-bold uppercase mb-2">Download</h3>
+              <h2 className="text-3xl font-bold uppercase mb-2">Download</h2>
               <p className="text-zinc-400 mb-8">Select a format to save your evaluation results.</p>
 
               <div className="flex flex-col gap-3">
@@ -1172,7 +1205,7 @@ ${inputText}
                   <Bot className="w-5 h-5 text-white" />
                   <span className="font-mono text-sm uppercase tracking-widest font-bold">Live Concierge</span>
                 </div>
-                <button onClick={() => setIsConciergeOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+                <button onClick={() => setIsConciergeOpen(false)} className="text-zinc-400 hover:text-white transition-colors">
                   <Minimize2 className="w-4 h-4" />
                 </button>
               </div>
@@ -1207,6 +1240,7 @@ ${inputText}
                   onClick={handleSendChatMessage}
                   disabled={!chatInput.trim() || isChatLoading}
                   className="bg-white text-black p-2 rounded-lg disabled:opacity-50"
+                  aria-label="Send message"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -1218,6 +1252,7 @@ ${inputText}
         <button
           onClick={() => setIsConciergeOpen(!isConciergeOpen)}
           className="bg-zinc-900 border border-zinc-800 text-white p-4 rounded-full shadow-lg hover:bg-zinc-800 transition-colors flex items-center justify-center"
+          aria-label="Toggle Live Concierge"
         >
           {isConciergeOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
         </button>
