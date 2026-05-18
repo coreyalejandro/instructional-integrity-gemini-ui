@@ -5,6 +5,8 @@ import { Info, Volume2, Square, Undo2, MessageSquare, X, History, Download, Bot,
 import { jsPDF } from 'jspdf';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { cn } from './lib/utils';
+import RubricPresets from "./components/RubricPresets";
+import type { RubricPreset } from "./components/RubricPresets";
 
 // --- Types ---
 type Step = 1 | 2 | 3 | 4;
@@ -63,6 +65,7 @@ export default function App() {
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [versions, setVersions] = useState<ArtifactVersion[]>([]);
   const [isVersionHistoryModalOpen, setIsVersionHistoryModalOpen] = useState(false);
+  const [showRubricPresets, setShowRubricPresets] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [thinkAloudText, setThinkAloudText] = useState('');
   const [isConciergeOpen, setIsConciergeOpen] = useState(false);
@@ -437,6 +440,11 @@ ${inputText}
     }
   };
 
+  const handleSelectRubricPreset = (preset: RubricPreset) => {
+    setInputText(preset.content);
+    setShowRubricPresets(false);
+  };
+
   const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -760,6 +768,15 @@ ${inputText}
                     >
                       <History className="w-4 h-4" /> History
                     </button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setShowRubricPresets(true)}
+                      className="px-6 py-3 bg-transparent border-2 border-[#c6a679] text-[#8b7347] hover:bg-[#c6a679]/10 font-medium rounded-full flex items-center gap-2 transition-colors cursor-pointer font-mono text-sm uppercase tracking-widest"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Browse OC Rubric Templates
+                    </motion.button>
                   </div>
                   <button 
                     onClick={startEvaluation}
@@ -1257,6 +1274,12 @@ ${inputText}
           {isConciergeOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
         </button>
       </div>
+      {/* OC Rubric Presets Modal */}
+      <RubricPresets
+        isVisible={showRubricPresets}
+        onClose={() => setShowRubricPresets(false)}
+        onSelectPreset={handleSelectRubricPreset}
+      />
     </>
   );
 }

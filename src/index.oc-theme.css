@@ -1,0 +1,348 @@
+/* ============================================================================
+   OC INSTRUCTIONAL INTEGRITY STUDIO — Theme Override Layer
+   
+   INSTRUCTIONS: Add this file to src/ and import it in src/main.tsx 
+   AFTER the existing index.css import:
+   
+     import './index.css';
+     import './index.oc-theme.css';  // ADD THIS LINE
+   
+   This layer overrides the dark "Studio" aesthetic with Odessa College's
+   navy/gold institutional colors while preserving all layout, animations,
+   glassmorphism, and functionality.
+   ============================================================================ */
+
+@import "tailwindcss";
+
+/* ─── CSS Variable Overrides ─── */
+:root {
+  --oc-navy: #2d3e50;
+  --oc-navy-light: #3d5060;
+  --oc-navy-dark: #1e2b3a;
+  --oc-gold: #c6a679;
+  --oc-gold-light: #d4b88a;
+  --oc-gold-dark: #8b7347;
+  --oc-cream: #faf8f5;
+  --oc-cream-dark: #f5f0e8;
+  --oc-border: #e8e2d8;
+  --oc-text: #2c2c2c;
+  --oc-text-muted: #666666;
+  --oc-text-light: #999999;
+  --oc-white: #ffffff;
+  --oc-green: #27ae60;
+  --oc-green-light: #2ecc71;
+  --oc-amber: #f39c12;
+  --oc-red: #c0392b;
+  --oc-red-light: #e74c3c;
+  --oc-blue: #3498db;
+}
+
+/* ─── Global Background ─── */
+html, body, #root {
+  background-color: var(--oc-cream) !important;
+}
+
+/* ─── Selection ─── */
+::selection {
+  background-color: var(--oc-gold) !important;
+  color: var(--oc-navy) !important;
+}
+
+/* ─── Main App Container ─── */
+.min-h-screen.font-sans {
+  background-color: var(--oc-cream) !important;
+  color: var(--oc-text) !important;
+}
+
+/* ─── Stage Navigation (Top Tabs) ─── */
+.min-h-screen.font-sans > div:first-child {
+  background-color: var(--oc-white) !important;
+  border-color: var(--oc-border) !important;
+}
+
+/* Stage nav buttons */
+.min-h-screen.font-sans > div:first-child button {
+  color: var(--oc-text-muted) !important;
+}
+.min-h-screen.font-sans > div:first-child button[class*="text-white"] {
+  color: var(--oc-navy) !important;
+}
+.min-h-screen.font-sans > div:first-child button[class*="text-white"]::after {
+  background-color: var(--oc-gold) !important;
+}
+
+/* ─── Content Sections ─── */
+section.bg-\[\#050505\],
+section.bg-\[\#0a0a0a\],
+section.bg-zinc-950,
+.bg-\[\#050505\],
+.bg-\[\#0a0a0a\] {
+  background-color: var(--oc-cream) !important;
+}
+
+/* ─── Text Colors ─── */
+.text-white {
+  color: var(--oc-text) !important;
+}
+.text-zinc-100,
+.text-zinc-200,
+.text-zinc-300 {
+  color: var(--oc-text) !important;
+}
+.text-zinc-400,
+.text-zinc-500,
+.text-zinc-600 {
+  color: var(--oc-text-muted) !important;
+}
+.text-zinc-700,
+.text-zinc-800,
+.text-zinc-900 {
+  color: var(--oc-text) !important;
+}
+
+/* ─── Headings ─── */
+h1.text-white,
+h2.text-white,
+h3.text-white {
+  color: var(--oc-navy) !important;
+}
+
+/* ─── Glass Panels ─── */
+[class*="bg-zinc-950\/40"],
+[class*="bg-zinc-950\/60"],
+[class*="bg-black\/60"],
+[class*="bg-black\/40"],
+[class*="bg-\[\#0a0a0a\]\/60"],
+[class*="bg-\[\#050505\]\/80"],
+[class*="bg-\[\#0a0a0a\]\/50"] {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  border-color: var(--oc-border) !important;
+}
+
+/* Glass panel text */
+[class*="bg-zinc-950\/40"] h1,
+[class*="bg-zinc-950\/40"] h2,
+[class*="bg-zinc-950\/40"] h3,
+[class*="bg-zinc-950\/40"] p,
+[class*="bg-zinc-950\/40"] span,
+[class*="bg-zinc-950\/60"] h1,
+[class*="bg-zinc-950\/60"] h2,
+[class*="bg-zinc-950\/60"] h3,
+[class*="bg-zinc-950\/60"] p,
+[class*="bg-zinc-950\/60"] span {
+  color: var(--oc-text) !important;
+}
+
+/* ─── Cards / Input Containers ─── */
+[class*="bg-zinc-950\/30"],
+[class*="bg-zinc-950\/50"],
+[class*="bg-\[\#0a0a0a\]\/40"],
+.bg-zinc-950\/30,
+.bg-zinc-950\/50,
+.bg-zinc-950 {
+  background-color: var(--oc-white) !important;
+  border-color: var(--oc-border) !important;
+}
+
+/* ─── Textarea Input ─── */
+textarea[class*="bg-zinc-950"],
+textarea[class*="bg-\[\#0a0a0a\]"] {
+  background-color: var(--oc-cream-dark) !important;
+  border-color: var(--oc-border) !important;
+  color: var(--oc-text) !important;
+}
+textarea[class*="bg-zinc-950"]:focus,
+textarea[class*="bg-\[\#0a0a0a\]"]:focus {
+  border-color: var(--oc-gold) !important;
+  box-shadow: 0 0 0 2px rgba(198, 166, 121, 0.2) !important;
+}
+textarea[class*="bg-zinc-950"]::placeholder,
+textarea[class*="bg-\[\#0a0a0a\]"]::placeholder {
+  color: var(--oc-text-light) !important;
+}
+
+/* ─── Buttons ─── */
+
+/* Primary green buttons → OC Navy */
+button[class*="bg-green-500"],
+button[class*="bg-green-600"],
+.bg-green-500,
+.bg-green-600 {
+  background-color: var(--oc-navy) !important;
+  color: var(--oc-white) !important;
+}
+button[class*="bg-green-500"]:hover,
+button[class*="bg-green-600"]:hover {
+  background-color: var(--oc-navy-light) !important;
+}
+
+/* Text green → OC Gold */
+button[class*="text-green-500"],
+button[class*="text-green-400"],
+.text-green-500,
+.text-green-400 {
+  color: var(--oc-gold-dark) !important;
+}
+
+/* Border green → OC Gold */
+button[class*="border-green-500"],
+.border-green-500 {
+  border-color: var(--oc-gold) !important;
+}
+
+/* Success green backgrounds */
+[class*="bg-green-500\/10"],
+[class*="bg-green-500\/20"] {
+  background-color: rgba(198, 166, 121, 0.15) !important;
+}
+
+/* ─── Analysis Type Selectors ─── */
+button[class*="border-zinc-700"],
+button[class*="border-zinc-800"] {
+  border-color: var(--oc-border) !important;
+  background-color: var(--oc-cream-dark) !important;
+}
+button[class*="border-zinc-700"]:hover,
+button[class*="border-zinc-800"]:hover {
+  border-color: var(--oc-gold) !important;
+}
+
+/* Selected analysis type */
+button[class*="border-green-500"][class*="text-green-500"] {
+  border-color: var(--oc-gold) !important;
+  color: var(--oc-gold-dark) !important;
+  background-color: rgba(198, 166, 121, 0.1) !important;
+}
+
+/* ─── Progress Bar ─── */
+[class*="bg-green-500"] {
+  background-color: var(--oc-gold) !important;
+}
+
+/* ─── Dimension Cards (Results) ─── */
+[class*="bg-\[\#0a0a0a\]\/40"] h3,
+[class*="bg-\[\#0a0a0a\]\/40"] p,
+[class*="bg-zinc-950\/40"] h3,
+[class*="bg-zinc-950\/40"] p {
+  color: var(--oc-text) !important;
+}
+
+/* Dimension score badges */
+span[class*="bg-green-500\/20"],
+span[class*="bg-green-500\/10"] {
+  background-color: rgba(198, 166, 121, 0.15) !important;
+  color: var(--oc-gold-dark) !important;
+}
+
+span[class*="bg-red-500\/20"],
+span[class*="bg-red-500\/10"] {
+  background-color: rgba(192, 57, 43, 0.15) !important;
+  color: var(--oc-red) !important;
+}
+
+span[class*="bg-amber-500\/20"],
+span[class*="bg-amber-500\/10"] {
+  background-color: rgba(243, 156, 18, 0.15) !important;
+  color: var(--oc-amber) !important;
+}
+
+/* ─── Think Aloud Stream ─── */
+[class*="bg-zinc-950\/30"] {
+  background-color: var(--oc-white) !important;
+  border-color: var(--oc-border) !important;
+}
+[class*="bg-zinc-950\/30"] span,
+[class*="bg-zinc-950\/30"] p {
+  color: var(--oc-text) !important;
+}
+
+/* ─── Concierge Chat ─── */
+.bg-zinc-950\/40 {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Concierge messages */
+[class*="bg-zinc-900\/50"] {
+  background-color: var(--oc-cream-dark) !important;
+}
+[class*="bg-green-500\/10"] {
+  background-color: rgba(198, 166, 121, 0.15) !important;
+}
+
+/* Concierge input */
+[class*="bg-zinc-950\/60"] {
+  background-color: var(--oc-cream-dark) !important;
+  border-color: var(--oc-border) !important;
+}
+
+/* ─── Step Indicators ─── */
+[class*="text-green-400"] {
+  color: var(--oc-gold-dark) !important;
+}
+[class*="text-red-400"] {
+  color: var(--oc-red) !important;
+}
+
+/* ─── Rounded corner preservation ─── */
+/* Keep the 32px rounded corners from the original design */
+.rounded-\[32px\],
+[class*="rounded-[32px]"] {
+  border-radius: 32px !important;
+}
+
+/* ─── Border colors ─── */
+.border-zinc-700,
+.border-zinc-800 {
+  border-color: var(--oc-border) !important;
+}
+.border-zinc-600 {
+  border-color: var(--oc-border) !important;
+}
+
+/* ─── Overlay backgrounds ─── */
+.bg-black\/60,
+.bg-black\/80,
+[class*="bg-black\/60"] {
+  background-color: rgba(45, 62, 80, 0.6) !important;
+}
+
+/* ─── Version History Items ─── */
+[class*="hover:bg-zinc-800\/50"]:hover {
+  background-color: var(--oc-cream-dark) !important;
+}
+
+/* ─── Font overrides ─── */
+h1, h2, h3 {
+  font-family: 'Crimson Pro', Georgia, serif !important;
+}
+
+/* ─── Custom Scrollbar ─── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--oc-cream-dark);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--oc-border);
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--oc-gold);
+}
+
+/* ─── Animations preserved ─── */
+/* All motion.div animations, parallax, and transitions are preserved */
+
+/* ─── Print styles ─── */
+@media print {
+  .min-h-screen.font-sans {
+    background-color: white !important;
+    color: black !important;
+  }
+  [class*="bg-zinc-950\/40"] {
+    background: white !important;
+  }
+}
