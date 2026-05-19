@@ -77,6 +77,14 @@ export default function App() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const chatRef = useRef<any>(null);
 
+  // ?mode=odessa — force OC rubric presets open for portfolio/hiring demos
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'odessa') {
+      setShowRubricPresets(true);
+    }
+  }, []);
+
   useEffect(() => {
     const savedDraft = localStorage.getItem('instructional_integrity_draft');
     if (savedDraft) {
